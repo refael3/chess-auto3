@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Chess Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard.min.css">
+    <style>
+        #board {
+            width: 500px;
+            margin: 20px auto;
+        }
+        #status {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="board"></div>
+    <div id="status">White to move</div>
+
+    <script>
+        const board = Chessboard('board', {
+            draggable: true,
+            position: 'start',
+            onDrop: onDrop
+        });
+
+        const game = new Chess();
+
+        // Function to evaluate board position and return a score
+        function evaluateBoard(board, isWhite) {
+            const pieceValues = {
+                p: 1,
+                n: 3,
+                b: 3,
+                r: 5,
+                q: 9,
+                k: 1000
+            };
+
+            let score = 0;
+            for (let square in board) {
+                const piece = board[square];
+                if (piece) {
+                    const value = pieceValues[piece.type] || 0;
+                    score += piece.color === 'w' ? value : -value;
+                }
+            }
+            return isWhite ? score : -score;
+        }
+
+        // Minimax algorithm with alpha-beta pruning
+        function minimax(depth, isMaximizing, alpha, beta) {
+            if (depth === 0 || game.isGameOver()) {
+                return evaluateBoard(game.board(), !isMaximizing);
+            }
+
+            const moves = game.ugly_moves();
+            let bestValue = isMaximizing ? -Infinity : Infinity;
+
+            for (const move of moves) {
+                game.ugly_move(move);
+                const value = minimax(depth - 1, !isMaximizing, alpha, beta);
+                game.undo();
+
+                if (isMaximizing) {
+                    bestValue = Math.max(bestValue, value);
+                    alpha = Math.max(alpha, value);
+                } else {
+                    bestValue = Math.min(bestValue, value);
+                    beta = Math.min(beta, value);
+                }
+
+                if (beta <= alpha) {
+                    break;
+                }
+            }
+
+            return bestValue;
+        }
+
+        // Find the best move using Minimax
+        function getBestMove(depth) {
+            let bestMove = null;
+            let bestValue = -Infinity;
+
+            for (const move of game.ugly_moves()) {
+                game.ugly_move(move);
+                const value = minimax(depth - 1, false, -Infinity, Infinity);
+                game.undo();
+
+                if (value > bestValue) {
+                    bestValue = value;
+                    bestMove = move;
+                }
+            }
+
+            return bestMove;
+        }
+
+        // Handle piece drop event
+        function onDrop(source, target) {
+            const move = game.move({ from: source, to: target, promotion: 'q' });
+
+            if (move === null) return 'snapback';
+            updateStatus();
+
+            // Let AI make a move
+            window.setTimeout(() => {
+                const bestMove = getBestMove(3); // Depth of 3 for AI
+                game.ugly_move(bestMove);
+                board.position(game.fen());
+                updateStatus();
+            }, 250);
+        }
+
+        // Update game status
+        function updateStatus() {
+            let status = '';
+
+            if (game.isCheckmate()) {
+                status = `Game over, ${game.turn() === 'w' ? 'Black' : 'White'} wins by checkmate!`;
+            } else if (game.isDraw()) {
+                status = 'Game over, it's a draw!';
+            } else {
+                status = `${game.turn() === 'w' ? 'White' : 'Black'} to move`;
+            }
+
+            document.getElementById('status').textContent = status;
+        }
+
+        updateStatus();
+    </script>
+</body>
+</html>
